@@ -5,17 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Heart Code Animation - Roqa</title>
     <style>
-        body {
+        body, html {
             margin: 0;
             padding: 0;
-            background-color: #000;
+            width: 100%;
+            height: 100%;
             overflow: hidden;
+            background-color: #000;
+            background: radial-gradient(circle at center, #110008 0%, #000000 100%);
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            font-family: 'Courier New', Courier, monospace;
+            font-family: 'Consolas', 'Courier New', monospace;
+            user-select: none;
+            direction: rtl; /* لضبط اتجاه النص العربي */
         }
+
         canvas {
             display: block;
             position: absolute;
@@ -23,70 +28,479 @@
             left: 0;
             z-index: 1;
         }
-        .text-container {
+
+        #ui-container {
             position: relative;
-            z-index: 2;
-            color: #fff;
-            font-size: 3rem;
-            font-weight: bold;
-            text-shadow: 0 0 15px #ff0055, 0 0 30px #ff0055;
-            opacity: 0;
-            animation: fadeIn 2s ease-in-out 3.5s forwards; 
-            pointer-events: none;
+            z-index: 10;
+            text-align: center;
+            width: 90%;
+            max-width: 600px;
         }
+
+        .intro-text {
+            color: #0f0;
+            font-size: clamp(1rem, 4vw, 1.5rem);
+            text-shadow: 0 0 5px #0f0;
+            margin-bottom: 20px;
+            opacity: 0;
+        }
+
+        .main-text {
+            color: #fff;
+            font-size: clamp(2rem, 8vw, 4.5rem);
+            font-weight: bold;
+            text-shadow: 0 0 15px #ff0055, 0 0 30px #ff0055, 0 0 45px #ff0055;
+            margin-bottom: 15px;
+            display: none;
+            direction: ltr; /* للحفاظ على الإنجليزي */
+            line-height: 1.4;
+        }
+
+        .date-text {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: clamp(1.2rem, 5vw, 1.8rem);
+            letter-spacing: 4px;
+            text-shadow: 0 0 10px #ff0055;
+            font-weight: bold;
+            display: none;
+        }
+
+        /* --- تنسيقات الأسئلة والأزرار (تم التعديل لضمان الظهور) --- */
+        #quiz-container {
+            width: 100%;
+            display: none; 
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            position: relative;
+            z-index: 20;
+        }
+        
+        #questionText {
+            color: #fff;
+            font-size: clamp(1.8rem, 6vw, 2.5rem);
+            font-weight: bold;
+            text-shadow: 0 0 15px #ff0055;
+            margin-bottom: 30px;
+            direction: rtl; /* عربي */
+            opacity: 1 !important; /* إجبار الظهور */
+            display: block !important;
+        }
+
+        .btn-group {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+            pointer-events: auto; /* الأزرار قابلة للضغط */
+        }
+
+        .quiz-btn {
+            background: rgba(255, 0, 85, 0.15);
+            border: 3px solid #ff0055;
+            color: #fff;
+            padding: 12px 25px;
+            font-size: clamp(1.2rem, 4vw, 1.5rem);
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-shadow: 0 0 5px #ff0055;
+            box-shadow: 0 0 10px rgba(255, 0, 85, 0.3);
+            font-family: inherit;
+        }
+
+        .quiz-btn:hover {
+            background: #ff0055;
+            box-shadow: 0 0 25px #ff0055, 0 0 50px #ff4488;
+            transform: scale(1.1);
+        }
+
+        #hidden-message {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 1rem;
+            opacity: 0;
+            z-index: 3;
+            transition: opacity 1s ease;
+            animation: float 2s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(-50%, 0); }
+            50% { transform: translate(-50%, -10px); }
+        }
+
         @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.8); }
-            to { opacity: 1; transform: scale(1); }
+            to { opacity: 1; }
+        }
+
+        @keyframes pulseGlow {
+            0% { text-shadow: 0 0 10px #ff0055; transform: scale(1); }
+            50% { text-shadow: 0 0 25px #ff0055, 0 0 50px #ff4488; transform: scale(1.05); }
+            100% { text-shadow: 0 0 10px #ff0055; transform: scale(1); }
         }
     </style>
 </head>
 <body>
+
+    <audio id="bgMusic" loop>
+        <source src="music.mp3" type="audio/mpeg">
+    </audio>
+
     <canvas id="heartCanvas"></canvas>
-    <div class="text-container">i love Roqa</div>
+
+    <div id="ui-container">
+        <div id="typewriter" class="intro-text"></div>
+        
+        <div id="mainName" class="main-text">i love Roqa</div>
+        <div id="specialDate" class="date-text">9 / 1 / 2026 ♾️</div>
+
+        <div id="quiz-container">
+            <h2 id="questionText"></h2>
+            <div id="btn-group" class="btn-group"></div>
+        </div>
+    </div>
+
+    <div id="hidden-message">Tap anywhere ✨</div>
+
     <script>
         const canvas = document.getElementById('heartCanvas');
         const ctx = canvas.getContext('2d');
+        const mainNameDiv = document.getElementById('mainName');
+        const dateDiv = document.getElementById('specialDate');
+        const quizContainer = document.getElementById('quiz-container');
+        const hiddenMsgDiv = document.getElementById('hidden-message');
+        const bgMusic = document.getElementById('bgMusic');
 
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            ctx.fillStyle = 'black';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        let width, height, scale;
+        let particles = [];
+        let stars = [];
+        let trails = [];
+        const particleCount = 1500;
+        const starCount = 200;
+        let heartPoints = [];
+        let time = 0;
+        let state = 'intro';
+        let musicStarted = false;
+
+        // --- الرسائل الكثيرة رجعت تاني قبل الأسئلة ---
+        const messages = [
+            "Wait... Don't click! 😒",
+            "I said stop clicking! 😠",
+            "Okay, you're stubborn... 😂",
+            "Since you won't stop...",
+            "I just wanted to say...",
+            "Distance means nothing...",
+            "Focus on your dreams 📚✨",
+            "I'll be right here waiting for you",
+            "عندي ليكي كام سؤال الأول 👀",
+            "جاهزة؟ ❤️"
+        ];
+        
+        // مصفوفة الأسئلة
+        const questions = [
+            { q: "مبسوطة؟ 😍", answers: ["جداً 💖", "أكيد 🥰"] },
+            { q: "عجبتك العيدية؟ 🎁", answers: ["تحفة 🙈", "أحلى عيدية 😘"] },
+            { q: "مين قلب روقة؟ 👑", answers: ["أنت طبعاً ❤️", "حبيبي اللي عمل الكود ده 💻"] }
+        ];
+
+        let clickCount = 0;
+        let currentQuestion = 0;
+        let inQuizMode = false;
+        let quizFinished = false;
+
+        const mouse = { x: undefined, y: undefined, radius: 100 };
+        
+        function updateMouse(x, y) {
+            mouse.x = x;
+            mouse.y = y;
+            trails.push({x: x, y: y, life: 1, size: Math.random() * 4 + 2});
         }
-        resizeCanvas();
+        window.addEventListener('mousemove', (e) => updateMouse(e.x, e.y));
+        window.addEventListener('touchmove', (e) => updateMouse(e.touches[0].clientX, e.touches[0].clientY));
 
-        let t = 0;
-        const scale = 18; 
+        // دالة الانفجار
+        function triggerExplosion() {
+            particles.forEach(p => {
+                p.ease = Math.random() * 0.1 + 0.05; 
+                p.targetX = (p.targetX - width/2) * 8 + width/2; 
+                p.targetY = (p.targetY - height/2) * 8 + height/2;
+            });
 
-        function draw() {
-            const cx = canvas.width / 2;
-            const cy = canvas.height / 2;
+            setTimeout(() => {
+                initHeartPoints();
+                particles.forEach(p => {
+                    const target = heartPoints[Math.floor(Math.random() * heartPoints.length)];
+                    p.targetX = target.x + width / 2;
+                    p.targetY = target.y + height / 2;
+                    p.ease = Math.random() * 0.02 + 0.01; 
+                });
+                state = 'pulse';
+            }, 800);
+        }
 
-            ctx.strokeStyle = '#ff0055'; 
-            ctx.lineWidth = 1.5;
+        // عرض السؤال (تم إصلاح ظهور النص)
+        function showQuestion(index) {
+            const q = questions[index];
+            const qText = document.getElementById('questionText');
+            qText.innerText = q.q; // استخدام innerText لضمان القراءة
 
-            for (let i = 0; i < 3; i++) {
-                if (t > Math.PI * 2) return; 
+            const btnGroup = document.getElementById('btn-group');
+            btnGroup.innerHTML = ''; 
+            
+            q.answers.forEach(ans => {
+                let btn = document.createElement('button');
+                btn.className = 'quiz-btn';
+                btn.innerHTML = ans;
+                btn.onclick = (e) => {
+                    e.stopPropagation(); 
+                    triggerExplosion();
+                    currentQuestion++;
+                    
+                    if (currentQuestion < questions.length) {
+                        setTimeout(() => showQuestion(currentQuestion), 400); 
+                    } else {
+                        setTimeout(endQuiz, 500);
+                    }
+                };
+                btnGroup.appendChild(btn);
+            });
+        }
 
-                const x = 16 * Math.pow(Math.sin(t), 3);
-                const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+        // إنهاء الأسئلة والختام بـ "جموستي ياناس"
+        function endQuiz() {
+            quizContainer.style.opacity = '0';
+            setTimeout(() => {
+                quizContainer.style.display = 'none';
+                
+                mainNameDiv.innerHTML = "You are my world ❤️<br>جموستي ياناس";
+                
+                mainNameDiv.style.direction = 'rtl'; 
+                mainNameDiv.style.display = 'block';
+                dateDiv.style.display = 'block';
+                inQuizMode = false;
+                quizFinished = true;
+                triggerExplosion();
+            }, 500);
+        }
 
-                ctx.beginPath();
-                ctx.moveTo(cx, cy - 20); 
-                ctx.lineTo(cx + x * scale, cy + y * scale); 
-                ctx.stroke();
+        // التفاعل مع الشاشة
+        window.addEventListener('click', (e) => {
+            if (inQuizMode && e.target.tagName.toLowerCase() !== 'button') return; 
 
-                t += 0.01; 
+            if (!musicStarted) {
+                bgMusic.play().catch(err => console.log("Audio waiting"));
+                musicStarted = true;
             }
-            requestAnimationFrame(draw);
-        }
-        draw();
 
-        window.addEventListener('resize', () => {
-            resizeCanvas();
-            t = 0; 
-            draw();
+            if (inQuizMode) return; 
+            
+            if (quizFinished) {
+                triggerExplosion(); 
+                return;
+            }
+
+            if (state === 'pulse' || state === 'clicked') {
+                state = 'clicked';
+                hiddenMsgDiv.style.opacity = '0'; 
+                
+                mainNameDiv.innerHTML = messages[clickCount];
+                clickCount++;
+                
+                triggerExplosion();
+
+                if (clickCount >= messages.length) {
+                    inQuizMode = true;
+                    setTimeout(() => {
+                        mainNameDiv.style.display = 'none';
+                        dateDiv.style.display = 'none';
+                        quizContainer.style.display = 'block'; 
+                        setTimeout(() => quizContainer.style.opacity = '1', 50); 
+                        showQuestion(0);
+                    }, 800);
+                } else {
+                    mainNameDiv.style.animation = "none";
+                    mainNameDiv.style.opacity = "1"; 
+                    void mainNameDiv.offsetWidth; 
+                    mainNameDiv.style.animation = "pulseGlow 1s infinite";
+                }
+            }
         });
+
+        // --- باقي دوال الرسم الأساسية ---
+        function resizeCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            scale = Math.min(width, height) / 40; 
+            if (scale > 20) scale = 20; 
+            initHeartPoints();
+            initStars();
+        }
+
+        function getHeartPoint(t) {
+            const x = 16 * Math.pow(Math.sin(t), 3);
+            const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+            return { x: x * scale, y: y * scale };
+        }
+
+        function initHeartPoints() {
+            heartPoints = [];
+            for (let t = 0; t < Math.PI * 2; t += 0.01) {
+                heartPoints.push(getHeartPoint(t));
+            }
+        }
+
+        class Star {
+            constructor() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.size = Math.random() * 1.5;
+                this.blinkSpeed = Math.random() * 0.05 + 0.01;
+                this.opacity = Math.random();
+            }
+            update() {
+                this.opacity += this.blinkSpeed;
+                if (this.opacity > 1 || this.opacity < 0) this.blinkSpeed *= -1;
+            }
+            draw() {
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.opacity})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function initStars() {
+            stars = [];
+            for (let i = 0; i < starCount; i++) {
+                stars.push(new Star());
+            }
+        }
+
+        class Particle {
+            constructor() { this.reset(); }
+            reset() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                const target = heartPoints[Math.floor(Math.random() * heartPoints.length)];
+                this.targetX = target.x + width / 2;
+                this.targetY = target.y + height / 2;
+                this.size = Math.random() * 2 + 0.5;
+                this.speedX = (Math.random() - 0.5) * 5;
+                this.speedY = (Math.random() - 0.5) * 5;
+                this.color = `hsla(${Math.random() * 20 + 340}, 100%, 65%, ${Math.random() * 0.8 + 0.2})`;
+                this.ease = Math.random() * 0.02 + 0.01;
+            }
+            update() {
+                if (state === 'formation' || state === 'pulse' || state === 'clicked') {
+                    this.x += (this.targetX - this.x) * this.ease;
+                    this.y += (this.targetY - this.y) * this.ease;
+
+                    if (state === 'pulse') {
+                        const pulseFactor = Math.sin(time * 4) * 0.5;
+                        this.x += (this.targetX - width/2) * pulseFactor * 0.015;
+                        this.y += (this.targetY - height/2) * pulseFactor * 0.015;
+                    }
+
+                    let mDx = mouse.x - this.x;
+                    let mDy = mouse.y - this.y;
+                    let dist = Math.sqrt(mDx*mDx + mDy*mDy);
+                    if (dist < mouse.radius) {
+                        let force = (mouse.radius - dist) / mouse.radius;
+                        let angle = Math.atan2(mDy, mDx);
+                        this.x -= Math.cos(angle) * force * 5;
+                        this.y -= Math.sin(angle) * force * 5;
+                    }
+                } else {
+                    this.x += this.speedX;
+                    this.y += this.speedY;
+                    if (this.x > width || this.x < 0) this.speedX *= -1;
+                    if (this.y > height || this.y < 0) this.speedY *= -1;
+                }
+            }
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function initParticles() {
+            particles = [];
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new Particle());
+            }
+        }
+
+        const typewriterDiv = document.getElementById('typewriter');
+        function typeWriter(text, i, fnCallback) {
+            if (i < text.length) {
+                typewriterDiv.innerHTML = text.substring(0, i+1) + '<span aria-hidden="true">|</span>';
+                setTimeout(() => typeWriter(text, i + 1, fnCallback), 40); 
+            } else if (typeof fnCallback == 'function') {
+                typewriterDiv.innerHTML = text; 
+                setTimeout(fnCallback, 300); 
+            }
+        }
+
+        function startSequence() {
+            resizeCanvas();
+            initParticles();
+            initStars();
+            animate();
+
+            setTimeout(() => {
+                typewriterDiv.style.animation = "fadeIn 0.5s forwards";
+                typeWriter("System Ready...", 0, () => {
+                    typewriterDiv.innerHTML = "Forming Heart...";
+                    setTimeout(() => {
+                        state = 'formation';
+                        typewriterDiv.style.animation = "fadeIn 0.5s reverse forwards"; 
+                        
+                        setTimeout(() => {
+                            mainNameDiv.style.display = 'block'; 
+                            mainNameDiv.style.animation = "fadeIn 1s forwards, pulseGlow 2s infinite";
+                            dateDiv.style.display = 'block'; 
+                            dateDiv.style.animation = "fadeIn 1s forwards 0.5s";
+                            state = 'pulse';
+                            setTimeout(() => { hiddenMsgDiv.style.opacity = '1'; }, 2000);
+                        }, 1500);
+                    }, 500);
+                });
+            }, 100);
+        }
+
+        function animate() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+            ctx.fillRect(0, 0, width, height);
+
+            stars.forEach(s => { s.update(); s.draw(); });
+
+            for (let i = 0; i < trails.length; i++) {
+                let p = trails[i];
+                ctx.fillStyle = `rgba(255, 0, 85, ${p.life})`;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                p.life -= 0.05; 
+                p.size -= 0.1;
+                if (p.life <= 0) { trails.splice(i, 1); i--; }
+            }
+
+            particles.forEach(p => { p.update(); p.draw(); });
+            
+            time += 0.01;
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        startSequence();
+
     </script>
 </body>
 </html>
